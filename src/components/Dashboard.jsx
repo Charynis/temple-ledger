@@ -68,7 +68,7 @@ function RecentList(){
           <tr className="text-left border-b">
             <th className="py-2">Date</th>
             <th>Type</th>
-            <th>Category/Source</th>
+            <th>Category</th>
             <th>Amount</th>
           </tr>
         </thead>
