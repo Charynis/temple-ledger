@@ -11,8 +11,8 @@ export default function TransactionModal({ mode='income', onClose, editItem=null
   const [loading, setLoading] = useState(false)
 
   // Example predefined lists
-  const incomeSources = ['Donation', 'Rent', 'Interest','Hundi', 'Other']
-  const expenseCategories = ['Maintenance', 'Utilities', 'Salary', 'Supplies', 'Other']
+  const incomeSources = ['Receipt Books', 'Rent','Hundi', 'Others']
+  const expenseCategories = ['Salary', 'Utilities', 'Others']
 
   async function handleSubmit(e){
     e.preventDefault(); setLoading(true)
