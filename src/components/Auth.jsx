@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { supabase } from '../supabaseClient'
+
 const BASE_URL = import.meta.env.VITE_BASE_URL
 console.log("BASE URL: ", BASE_URL)
+
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -45,6 +47,7 @@ export default function Auth() {
     if (error) {
       setMessage(error.message)
     } else {
+
       setMessage('Password reset email sent. Please check your inbox.')
     }
     setLoading(false)
