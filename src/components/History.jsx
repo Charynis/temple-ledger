@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import TransactionModal from './TransactionModal'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
+import dayjs from 'dayjs'
 
 export default function History() {
   const [items, setItems] = useState([])
@@ -14,18 +15,22 @@ export default function History() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.rpc('get_all_transactions')
-    if (!data) {
-      const inc = await supabase.from('income').select('id,date,source,amount,notes')
-      const exp = await supabase.from('expenses').select('id,date,category,amount,notes')
-      const merged = []
-      if (inc.data) merged.push(...inc.data.map(r => ({ ...r, type: 'income', category: r.source })))
-      if (exp.data) merged.push(...exp.data.map(r => ({ ...r, type: 'expense' })))
-      merged.sort((a, b) => new Date(b.date) - new Date(a.date))
-      setItems(merged)
-    } else {
-      setItems(data)
-    }
+
+    // Fetch income
+    const inc = await supabase
+      .from('income')
+      .select('id,date,due_month,source,amount,notes,event,created_at')
+
+    // Fetch expenses
+    const exp = await supabase
+      .from('expenses')
+      .select('id,date,due_month,category,amount,notes,event,created_at')
+
+    const merged = []
+    if (inc.data) merged.push(...inc.data.map(r => ({ ...r, type: 'income', category: r.source })))
+    if (exp.data) merged.push(...exp.data.map(r => ({ ...r, type: 'expense' })))
+
+    setItems(merged)
     setLoading(false)
   }
 
@@ -44,7 +49,7 @@ export default function History() {
     setModalMode(it.type)
   }
 
-  // filter
+  // Filter
   const filteredItems = items.filter(it => {
     if (filter === 'all') return true
     if (filter === 'income') return it.type === 'income'
@@ -52,10 +57,18 @@ export default function History() {
     return true
   })
 
-  // sort
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sort === 'date-asc') return new Date(a.date) - new Date(b.date)
-    if (sort === 'date-desc') return new Date(b.date) - new Date(a.date)
+  // Sort including created_at for transactions on the same date
+  const sortedItems = [...filteredItems].filter(it => {
+    if (sort.startsWith('event-')) {
+      const ev = sort.split('-')[1]
+      return (it.event || 'general').toLowerCase() === ev.toLowerCase()
+    }
+    return true
+  }).sort((a, b) => {
+    if (sort === 'date-asc') 
+      return new Date(a.date) - new Date(b.date) || new Date(a.created_at) - new Date(b.created_at)
+    if (sort === 'date-desc') 
+      return new Date(b.date) - new Date(a.date) || new Date(b.created_at) - new Date(a.created_at)
     if (sort === 'amount-asc') return a.amount - b.amount
     if (sort === 'amount-desc') return b.amount - a.amount
     return 0
@@ -109,10 +122,19 @@ export default function History() {
             onChange={(e) => setSort(e.target.value)}
             className="border rounded px-2 py-1"
           >
-            <option value="date-desc">Date (Newest First)</option>
-            <option value="date-asc">Date (Oldest First)</option>
-            <option value="amount-desc">Amount (High to Low)</option>
-            <option value="amount-asc">Amount (Low to High)</option>
+            <optgroup label="Date & Amount">
+              <option value="date-desc">Date (Newest First)</option>
+              <option value="date-asc">Date (Oldest First)</option>
+              <option value="amount-desc">Amount (High to Low)</option>
+              <option value="amount-asc">Amount (Low to High)</option>
+            </optgroup>
+
+            <optgroup label="Events">
+              <option value="event-general">Event: General</option>
+              <option value="event-bonalu">Event: Bonalu</option>
+              <option value="event-navarathri">Event: Navarathri</option>
+              <option value="event-miscellaneous">Event: Miscellaneous</option>
+            </optgroup>
           </select>
         </div>
 
@@ -125,19 +147,23 @@ export default function History() {
                   <tr className="text-left border-b">
                     <th className="py-2">Date</th>
                     <th>Category</th>
+                    <th>Event</th>
                     <th>Amount</th>
+                    <th>Due Month</th>
                     <th>Notes</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedItems.map(it => (
-                    <tr key={it.id} className="border-b">
+                    <tr key={`${it.type}-${it.id}`} className="border-b">
                       <td className="py-2">{it.date}</td>
                       <td>{it.category}</td>
+                      <td>{it.event || 'General'}</td>
                       <td className={`${it.type === 'income' ? 'text-green-700' : 'text-red-700'}`}>
                         ₹{Number(it.amount).toFixed(2)}
                       </td>
+                      <td>{it.due_month ? dayjs(it.due_month).format('MMM-YYYY') : '-'}</td>
                       <td>{it.notes}</td>
                       <td className="space-x-2">
                         <button
@@ -159,7 +185,7 @@ export default function History() {
                   ))}
                   {sortedItems.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="text-center py-4 text-gray-500">No transactions found</td>
+                      <td colSpan="7" className="text-center py-4 text-gray-500">No transactions found</td>
                     </tr>
                   )}
                 </tbody>
@@ -169,7 +195,7 @@ export default function History() {
             {/* Mobile Card Layout */}
             <div className="sm:hidden flex flex-col gap-3">
               {sortedItems.map(it => (
-                <div key={it.id} className="border rounded-lg p-3 shadow-sm">
+                <div key={`${it.type}-${it.id}`} className="border rounded-lg p-3 shadow-sm">
                   <div className="flex justify-between">
                     <span className="font-medium">{it.category}</span>
                     <span className={`${it.type === 'income' ? 'text-green-700' : 'text-red-700'} font-semibold`}>
@@ -177,6 +203,10 @@ export default function History() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">{it.date}</div>
+                  <div className="text-xs text-blue-600">{it.event || 'General'}</div>
+                  <div className="text-xs text-purple-600">
+                    Due: {it.due_month ? dayjs(it.due_month).format('MMM-YYYY') : '-'}
+                  </div>
                   {it.notes && <div className="mt-1 text-sm">{it.notes}</div>}
                   <div className="mt-2 flex gap-2">
                     <button
